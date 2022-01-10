@@ -1,0 +1,22 @@
+########################
+## gitignore template ##
+########################
+
+# macOS stuff
+.DS_Store
+
+# other
+.vscode/
+__pycache__/
+
+# jupyter stuff
+.ipynb_checkpoints/
+
+# LaTeX stuff
+# *.pdf
+*.out
+*.aux
+*.log
+*latexmk
+*gz
+*fls
