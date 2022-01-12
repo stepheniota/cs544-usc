@@ -5,13 +5,6 @@
 # macOS stuff
 .DS_Store
 
-# other
-.vscode/
-__pycache__/
-
-# jupyter stuff
-.ipynb_checkpoints/
-
 # LaTeX stuff
 # *.pdf
 *.out
@@ -20,3 +13,14 @@ __pycache__/
 *latexmk
 *gz
 *fls
+
+# jupyter stuff
+.ipynb_checkpoints/
+
+# other
+.vscode/
+__pycache__/
+
+# specific
+readings/
+
