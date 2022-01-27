@@ -14,10 +14,10 @@ class Params:
         }
 
 def precision(true_pos, false_pos):
-    return true_pos / (true_pos + false_pos) if true_pos + false_pos != 0 else 0
+    return true_pos / (true_pos + false_pos)
 
 def recall(true_pos, false_neg):
-    return true_pos / (true_pos + false_neg) if true_pos + false_neg != 0 else 0
+    return true_pos / (true_pos + false_neg)
 
 def accuracy_score(y_true, y_pred):
     score = sum([true == pred for true, pred in zip(y_true, y_pred)])
@@ -26,21 +26,24 @@ def accuracy_score(y_true, y_pred):
 
 def f1_score(y_true, y_pred, n_classes=4):
     """ Calculates the mean f1 score across the four classes. """
-    from nbmodel import NaiveBayesClassifer
+    #from nbmodel import NaiveBayesClassifer
     scores = np.zeros(4, np.float64)
-    classes = NaiveBayesClassifer(n_classes).classes
+    classes = ['truthful', 'deceptive', 'positive', 'negative']
     for i, cls in enumerate(classes):
-        true_pos = false_neg = false_pos = 0
-        for label, pred in zip(y_true, y_pred):
-            if np.all(label == pred) and np.all(label == cls):
+        true_pos, false_pos, false_neg = 0, 0, 0
+        for true_labels, pred_labels in zip(y_true, y_pred):
+            idx = 0 if i == 0 or i == 1 else 1
+            true = true_labels.split('_')[idx]
+            pred = pred_labels.split('_')[idx]
+            if true == pred and true == cls:
                 true_pos += 1
-            elif np.any(label != pred) and np.all(label == cls):
+            elif true != pred and pred == cls:
+                false_pos += 1
+            elif true != pred and true == cls:
                 false_neg += 1
-            elif np.any(label != pred) and np.any(label != cls):
-                false_pos + 1
         p = precision(true_pos, false_pos)
         r = recall(true_pos, false_neg)
-        scores[i] = 2 * p * r / (p + r) if p + r != 0 else 0
+        scores[i] = (2 * p * r) / (p + r)
     return np.mean(scores)
 
 def save_predictions(data_cls, y_preds, file_name='nboutput.txt'):
