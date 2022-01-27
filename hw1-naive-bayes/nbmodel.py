@@ -74,15 +74,43 @@ class NaiveBayesClassifer:
 
     def predict(self, X):
         """ Perform classification on feature matrix X. """
+
         y_hat = [None for _ in range(len(X))]
+
+        if self.type == 'multinomial':
+            return self._predict_multi(y_hat, X)
+        else:
+            return self._predict_bern(y_hat, X)
+        
+
+    def _predict_multi(self, y_hat, X):
         for i_X, doc in enumerate(X):
             scores = np.zeros(self.n_classes, dtype=np.float64)
             for i_cls, cls in enumerate(self.classes):
-                scores[i_cls] = self.priors[cls]
+                scores[i_cls] = np.log(self.priors[cls])
                 for term in doc:
                     # exclude terms not in vocab
                     if term in self.vocab:
                         scores[i_cls] += np.log(self.condprob[i_cls][term])
+
+            i_max = np.argmax(scores)
+            y_hat[i_X] = self.classes[i_max]
+
+        return y_hat
+
+    
+    def _predict_bern(self, y_hat, X):
+        for i_X, doc in enumerate(X):
+            X_vocab = set(doc)
+        
+            scores = np.zeros(self.n_classes, dtype=np.float64)
+            for i_cls, cls in enumerate(self.classes):
+                scores[i_cls] = np.log(self.priors[cls])
+                for word in self.vocab: 
+                    if word in X_vocab:
+                        scores[i_cls] += np.log(self.condprob[i_cls][word])
+                    else:
+                        scores[i_cls] -= np.log(1 - self.condprob[i_cls][word])
 
             i_max = np.argmax(scores)
             y_hat[i_X] = self.classes[i_max]
