@@ -10,7 +10,7 @@ class NaiveBayesClassifer:
     """ Naive Bayes Classifier. """
 
     def __init__(self, n_classes=4, type='multinomial'):
-        if type != 'multinomial':
+        if type not in set(['multinomial', 'bernoulli']):
             raise NotImplementedError
         self.type = type
         if n_classes != 2 and n_classes != 4:
@@ -24,10 +24,40 @@ class NaiveBayesClassifer:
 
     def fit(self, X, y):
         """ Fit NB classifier according to X, y. """
-        # extract vocab
         for doc in X:
             self.vocab.update(doc)
 
+        if self.type == 'multinomial':
+            self._fit_multi(X, y)
+        else:
+            self._fit_bern(X, y)
+
+        # normalize priors 
+        for cls in self.classes:
+            self.priors[cls] /= len(X)
+    
+
+    def _fit_bern(self, X, y):
+        for i, cls in enumerate(self.classes):
+            for word in self.vocab:
+                for doc, y_label in zip(X, y):
+                    if y_label == cls:
+                        self.priors[cls] += 1
+                        if word in doc:
+                            self.condprob[i][word] += 1
+        
+        for word in self.vocab:
+            for i, cls in enumerate(self.classes):
+                if word not in self.condprob[i]:
+                    self.condprob[i][word] += 1
+        
+        # smoothing
+        for i, cls in enumerate(self.classes):
+            self.condprob[i] = {word:freq/(self.priors[cls] + 2) 
+                                for word, freq in self.condprob[i].items()}
+
+
+    def _fit_multi(self, X, y):
         for i, cls in enumerate(self.classes):
             for doc, y_label in zip(X, y):
                 if y_label == cls:
@@ -40,10 +70,6 @@ class NaiveBayesClassifer:
         for word in self.vocab:
             for cls_condprob in self.condprob:
                 cls_condprob[word] += 1
-
-        # normalize priors 
-        for cls in self.classes:
-            self.priors[cls] /= len(X)
 
 
     def predict(self, X):

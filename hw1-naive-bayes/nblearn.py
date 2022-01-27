@@ -13,16 +13,16 @@ def train(data_path, is_testing):
     train_data.read_txt()
     train_data.preprocess()
 
-    nb_model = NaiveBayesClassifer()
+    nb_model = NaiveBayesClassifer(type='bernoulli')
     nb_model.fit(train_data.X, train_data.y)
 
     nb_model.save_json()
 
     if is_testing:
         y_pred_train = nb_model.predict(train_data.X)
-        #score = f1_score(train_data.y, y_pred_train)
-        #print(f'mean f1 score on train set = {score}')
-        print(f'accuracy on train set = {accuracy_score(train_data.y, y_pred_train)}')
+        score = f1_score(train_data.y, y_pred_train)
+        print(f'mean f1 score on train set = {score}')
+        #print(f'accuracy on train set = {accuracy_score(train_data.y, y_pred_train)}')
 
 
         val_data = ReviewsData(Path('op_spam_test_data'), is_training=True)
@@ -30,9 +30,9 @@ def train(data_path, is_testing):
         val_data.preprocess()
 
         y_pred = nb_model.predict(val_data.X)
-        #score = f1_score(val_data.y, y_pred)
-        #print(f'mean f1 score on val set = {score}')
-        print(f'accuracy on train set = {accuracy_score(val_data.y, y_pred)}')
+        score = f1_score(val_data.y, y_pred)
+        print(f'mean f1 score on val set = {score}')
+        #print(f'accuracy on train set = {accuracy_score(val_data.y, y_pred)}')
         save_predictions(val_data, y_pred)
 
 
