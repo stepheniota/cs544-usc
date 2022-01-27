@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import numpy as np
@@ -25,4 +26,15 @@ class ReviewsData:
                 self.y.append(truthful + '_' + positive)
 
     def preprocess(self):
-        pass
+        self._normalize()
+
+
+    def _normalize(self):
+        for doc in self.X:
+            for i, word in enumerate(doc):
+                word = word.lower()
+                word = re.sub(r'\d+','', word)
+                word = re.sub(r'[^\w\s]', '', word)
+                word = re.sub(r'[!@#$.,]', '', word)
+                word = word.strip()
+                doc[i] = word

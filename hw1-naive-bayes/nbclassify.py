@@ -1,10 +1,8 @@
 import sys
 from pathlib import Path
 
-#import numpy as np
-
 from nbmodel import NaiveBayesClassifer
-from utils import *  #f1_score, print_predictions
+from utils import save_predictions
 from reviews_data import ReviewsData
 
 

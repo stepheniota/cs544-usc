@@ -33,7 +33,8 @@ class NaiveBayesClassifer:
                 if y_label == cls:
                     self.priors[cls] += 1
                     cur_wordlist = Counter(doc)
-                    self.condprob[i].update(cur_wordlist)
+                    for word, count in cur_wordlist.items():
+                        self.condprob[i][word] += count
 
         # Laplace smoothing for all words
         for word in self.vocab:
