@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 from nbmodel import NaiveBayesClassifer
-from utils import save_predictions
+from utils import save_predictions, f1_score
 from reviews_data import ReviewsData
 
 

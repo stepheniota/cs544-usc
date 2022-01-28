@@ -9,14 +9,14 @@ from utils import Params
 
 
 class ReviewsData:
-    def __init__(self, data_path, is_training=True, remove_stopwords=True):
+    def __init__(self, data_path, is_training=True):
         self.data_path = Path(data_path)
         self.X = []
         self.y = [] if is_training else None
         self.paths = []
         self.classes = Params().classes
+        self.vocablist = Params().vocablist
         self.stopwords = Params().stopwords
-        self.remove_stopwords = remove_stopwords
 
     def read_txt(self):
         paths = self.data_path.glob('**/*.txt')
@@ -31,14 +31,16 @@ class ReviewsData:
                 positive = 'positive' if 'positive' in p.parts[-4] else 'negative'
                 self.y.append(truthful + '_' + positive)
 
-    def preprocess(self, n_largest=1000):
+    def preprocess(self, n_largest=1000, use_vocab=True):
         self._normalize()
-        self._tokenize()
-        self._feature_selection(n_largest)
+        self._tokenize(use_vocab)
+        #self._feature_selection(n_largest)
     
-    def _tokenize(self):
+    def _tokenize(self, use_vocab):
         for i, doc in enumerate(self.X):
-            if self.remove_stopwords:
+            if use_vocab:
+                doc = ' '.join([word for word in doc.split() if word in self.vocablist])
+            else:
                 doc = ' '.join([word for word in doc.split() if word not in self.stopwords])
             doc = doc.split(' ')
             self.X[i] = doc
