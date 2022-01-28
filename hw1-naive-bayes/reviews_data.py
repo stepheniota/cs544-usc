@@ -3,55 +3,56 @@ import heapq
 from pathlib import Path
 from collections import defaultdict
 
-import numpy as np
-
 from utils import Params
 
 
 class ReviewsData:
-    def __init__(self, data_path, is_training=True):
-        self.data_path = Path(data_path)
+    def __init__(self, data_paths, is_training=True, fold_to_ignore=None, is_val=False):
+        self.data_paths = data_paths
         self.X = []
+        self.is_training = is_training
         self.y = [] if is_training else None
         self.paths = []
         self.classes = Params().classes
         self.vocablist = Params().vocablist
         self.stopwords = Params().stopwords
+        self.switchwords = Params().switchwords
 
     def read_txt(self):
-        paths = self.data_path.glob('**/*.txt')
-        for p in paths:
-            if p.parts[-1] == 'README.txt':
-                continue
+        for p in self.data_paths:
             with open(p, 'r') as f:
                 self.X.append(f.readlines())
             self.paths.append(p)
             if self.y is not None:
-                truthful = 'truthful' if 'truthful' in p.parts[-3] else 'deceptive'
-                positive = 'positive' if 'positive' in p.parts[-4] else 'negative'
+                truthful = 'truthful' if 'truthful' in Path(p).parts[-3] else 'deceptive'
+                positive = 'positive' if 'positive' in Path(p).parts[-4] else 'negative'
                 self.y.append(truthful + '_' + positive)
 
-    def preprocess(self, n_largest=1000, use_vocab=True):
+    def preprocess(self, use_vocab=True, use_stop=True):
         self._normalize()
-        self._tokenize(use_vocab)
+        self._tokenize(use_vocab, use_stop)
         #self._feature_selection(n_largest)
     
-    def _tokenize(self, use_vocab):
+    def _tokenize(self, use_vocab, use_stop):
         for i, doc in enumerate(self.X):
             if use_vocab:
                 doc = ' '.join([word for word in doc.split() if word in self.vocablist])
-            else:
+            if use_stop:
                 doc = ' '.join([word for word in doc.split() if word not in self.stopwords])
-            doc = doc.split(' ')
+
+            doc = ' '.join([self.switchwords[w] if w in self.switchwords else w for w in doc.split()])
+            doc = doc.split()
+
             self.X[i] = doc
 
 
     def _normalize(self):
         for i, doc in enumerate(self.X):
             doc = doc[0].lower()
-            doc = re.sub(r'\d+','', doc)
-            doc = re.sub(r'[^\w\s]', '', doc)
-            doc = re.sub(r'[!@#$.,]', '', doc)
+            doc = re.sub(r'[0-9]', ' ', doc)
+            #doc = re.sub(r'\d+','', doc)
+            #doc = re.sub(r'[^\w\s]', '', doc)
+            doc = re.sub(r'[!@#$.,]', ' ', doc)
             doc = doc.strip()
             self.X[i] = doc
 

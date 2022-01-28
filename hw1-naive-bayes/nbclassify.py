@@ -1,15 +1,19 @@
+import os
 import sys
+from glob import glob
 from pathlib import Path
 
 from nbmodel import NaiveBayesClassifer
-from utils import save_predictions, f1_score
+from utils import save_predictions
 from reviews_data import ReviewsData
 
 
 def main(data_path):
-    test_data = ReviewsData(data_path)
+    data_paths = glob(os.path.join(str(data_path), '*/*/*/*.txt'))
+
+    test_data = ReviewsData(data_paths, is_training=False)
     test_data.read_txt()
-    test_data.preprocess()
+    test_data.preprocess(use_vocab=False, use_stop=True)
 
     model = NaiveBayesClassifer()
     model.load_json()
@@ -20,8 +24,5 @@ def main(data_path):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 1:
-        data_path = Path('op_spam_training_data')
-    else:
-        data_path = Path(sys.argv[1])
+    data_path = 'op_spam_training_data' if len(sys.argv) == 1 else sys.argv[1]
     main(data_path)
