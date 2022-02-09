@@ -1,3 +1,5 @@
+"""Training script to learn HMM parameters."""
+
 import sys
 from pathlib import Path
 

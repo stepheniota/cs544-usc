@@ -1,3 +1,5 @@
+"""Test script to decode tokenized text using learned HMM params."""
+
 import sys
 
 from hmmmodel import HMM
