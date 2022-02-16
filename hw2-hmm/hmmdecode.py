@@ -4,19 +4,20 @@ import sys
 
 from hmmmodel import HMM
 from pos_data import POSData
+from utils import write_output
 
 
-def decode_hmm(data_path):
-    data = POSData(data_path, is_training=False)
+def decode_hmm(data_path: str) -> None:
+    data = POSData(data_path, train=False)
     data.read_txt()
 
-    hmm = HMM(is_training=False)
+    hmm = HMM(train=False)
     hmm.load_json()
     y_hat = hmm.decode(data.X)
 
+    write_output(data.X, y_hat)
+
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        decode_hmm(sys.argv[1])
-    else:
-        raise NotImplementedError
+    assert len(sys.argv) > 1 and "Must provide argument `/path/to/input`."
+    decode_hmm(sys.argv[1])
