@@ -8,38 +8,49 @@ import numpy as np
 class HMM:
     """Hidden Markov model with discrete (i.e. multinomial) emissions."""
     def __init__(self, train: bool = True) -> None:
-        self.train: bool = train
-        self.states: set = set()
-        self.obs: set = set()
-        self.initial_probs: dict = dict()  # assume categorical dist.
-        self.transitions: dict = dict()    # assume multinomial dist.
-        self.emissions: dict = dict()      # assume multinomial dist.
-        self.normalize: int = 0
+        self.train = train
+        self.states = set()
+        self.obs = set()
+        self.initial_probs = dict()  # assume categorical dist.
+        self.transitions = dict()    # assume multinomial dist.
+        self.emissions = dict()      # assume multinomial dist.
+        #self.normalize = 0
 
     def fit(self, X: List[List[str]], y: List[List[str]]) -> None:
         """Estimate HMM parameters."""
         self._init_params(X, y)
         self._fit_params(X, y)
-
         # TODO: Lazy normalization? i.e. normalize during decoding
-        #       Or do I even need to normalize? Not sure.
-        self.normalize = sum(
-            Counter(state for state_seq in y for state in state_seq).values()
-        )
+        self._normalize_params()
+    
+    def _normalize_params(self,):
+        # NOTE: n_seq is NOT equal to len(X) due to plus-one smoothing
+        n_seq = sum(self.initial_probs.values())
+        self.initial_probs = {state: n_init / n_seq
+                              for state, n_init in self.initial_probs.items()}
+        for state in self.transitions:
+            total_trans = sum(self.transitions[state].values())
+            self.transitions[state] = {
+                next_state: n_trans / total_trans 
+                for next_state, n_trans in self.transitions[state].items()
+            }
+            total_emiss = sum(self.emissions[state].values())
+            self.emissions[state] = {
+                obs: n_emiss / total_emiss
+                for obs, n_emiss in self.emissions[state].items()
+            }
 
     def _init_params(self, X, y):
         """Initialize state space, obs space and priors."""
-		# create state space from training data
+        # create state space from training data
         self.states = set(state for state_seq in y for state in state_seq)
-
         # initial probabilities: plus-one smoothing 
         self.initial_probs = {state: 1 for state in self.states}
-        # no smoothing for transitions or emissions?
+        # TODO: no smoothing for transitions or emissions?
         self.transitions = {state: defaultdict(lambda: 0) 
                             for state in self.states}
         self.emissions = {state: defaultdict(lambda: 0) 
                             for state in self.states}
-
         # Do I even need to save the obs space separately?
         # Already included in emissions.values().keys()
         if self.obs is None:
@@ -55,7 +66,6 @@ class HMM:
                     self.transitions[state_seq[i-1]][state] += 1
                 self.emissions[state][obs] += 1
 
-
     def decode(self, X: List[List[str]]) -> List[List[str]]:
         """Find the most likely state sequence corresponding to X. 
         Uses the Viterbi decoding algorithm.
@@ -69,12 +79,11 @@ class HMM:
         """Write model params to human-interpretable, json-format txt file."""
         params = vars(self)
         for key, var in params.items():
-            
             if isinstance(var, set):  
                 # sets can't be converted to json, go figure
-                print('TODO: convert sets to list, then back to set upon load.')
+                #print('TODO: convert sets to list, then back to set upon load.')
                 params[key] = list(var)
-            
+
         json_txt = json.dumps(vars(self), indent=4)
         with open(file_name, mode='w') as f:
             f.write(json_txt)
@@ -95,5 +104,3 @@ if __name__ == '__main__':
 
     hmm.load_json()
     print(vars(hmm))
-
-
