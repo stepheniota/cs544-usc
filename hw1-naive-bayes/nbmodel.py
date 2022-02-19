@@ -24,7 +24,6 @@ class NaiveBayesClassifer:
         self.condprob = [defaultdict(lambda:0) for _ in self.classes]
         self.vocab = set()
 
-
     def fit(self, X, y):
         """ Fit NB classifier according to X, y. """
         for doc in X:
@@ -44,7 +43,6 @@ class NaiveBayesClassifer:
         # normalize priors 
         for cls in self.classes:
             self.priors[cls] /= len(X)
-    
 
     def _fit_bern(self, X, y):
         for i, cls in enumerate(self.classes):
@@ -84,7 +82,6 @@ class NaiveBayesClassifer:
             self.condprob[i] = {word:freq/(self.priors[cls] + 2) 
                                 for word, freq in self.condprob[i].items()}
 
-
     def _fit_multi(self, X, y):
         for i, cls in enumerate(self.classes):
             for doc, y_label in zip(X, y):
@@ -104,7 +101,6 @@ class NaiveBayesClassifer:
             N = sum(cls_condprob.values())
             self.condprob[i] = {w:val/N for w, val in cls_condprob.items()}
             
-
     def _fit_multi_2(self, X, y):
         for i, cls in enumerate(self.classes):
             for doc, y_label in zip(X, y):
@@ -131,7 +127,6 @@ class NaiveBayesClassifer:
         else:
             return self._predict_bern(y_hat, X)
         
-
     def _predict_multi(self, y_hat, X):
         for i_X, doc in enumerate(X):
             scores = np.zeros(self.n_classes, dtype=np.float128)
@@ -161,7 +156,6 @@ class NaiveBayesClassifer:
             y_hat[i_X] = self.classes[i_max_a] + '_' + self.classes[i_max_b]
 
         return y_hat
-
     
     def _predict_bern(self, y_hat, X):
         for i_X, doc in enumerate(X):
@@ -186,7 +180,6 @@ class NaiveBayesClassifer:
 
         return y_hat
 
-
     def save_json(self, file_name='nbmodel.txt'):
         """ Write model params to human-readable txt file. """
         params = {}
@@ -201,7 +194,6 @@ class NaiveBayesClassifer:
         with open(file_name, 'w') as f:
             f.write(json_txt)
 
-
     def load_json(self, file_name='nbmodel.txt'):
         """ Load model params previously saved using self.dump(). """ 
         with open(file_name, 'r') as f:
@@ -213,4 +205,3 @@ class NaiveBayesClassifer:
         self.classes = params['classes']
         self.condprob = params['condprob']
         self.vocab = set(params['vocab'])
-

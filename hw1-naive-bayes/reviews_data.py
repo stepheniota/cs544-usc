@@ -45,7 +45,6 @@ class ReviewsData:
 
             self.X[i] = doc
 
-
     def _normalize(self):
         for i, doc in enumerate(self.X):
             doc = doc[0].lower()
