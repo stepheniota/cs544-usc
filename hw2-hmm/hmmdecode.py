@@ -1,5 +1,4 @@
-"""Test script to decode tokenized text using learned HMM params."""
-
+"""Decode tokenized text using learned HMM params."""
 import sys
 
 from hmmmodel import HMM
@@ -11,8 +10,8 @@ def decode_hmm(data_path: str) -> None:
     data = POSData(data_path, train=False)
     data.read_txt()
 
-    hmm = HMM(train=False)
-    hmm.load_json()
+    hmm = HMM()
+    hmm.load_params()
     y_hat = hmm.decode(data.X)
 
     write_output(data.X, y_hat)

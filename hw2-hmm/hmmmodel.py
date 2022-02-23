@@ -1,106 +1,150 @@
 """Hidden Markov model class."""
 import json
-from collections import Counter, defaultdict
-from typing import List, Optional
 
-import numpy as np
+from utils import normalize_dict, logaddexp2, logaddexp
 
 class HMM:
-    """Hidden Markov model with discrete (i.e. multinomial) emissions."""
-    def __init__(self, train: bool = True) -> None:
-        self.train = train
-        self.states = set()
-        self.obs = set()
-        self.initial_probs = dict()  # assume categorical dist.
-        self.transitions = dict()    # assume multinomial dist.
-        self.emissions = dict()      # assume multinomial dist.
-        #self.normalize = 0
+    """Hidden Markov model with discrete (i.e. categorical) emissions."""
+    def __init__(self,):
+        self.states = None
+        self.obs = None
+        self.init_probs = None # assume categorical dist.
+        self.trans = None      # assume categorical dist.
+        self.emiss = None      # assume categorical dist.
 
-    def fit(self, X: List[List[str]], y: List[List[str]]) -> None:
+    def fit(self, X, y):
         """Estimate HMM parameters."""
         self._init_params(X, y)
         self._fit_params(X, y)
-        # TODO: Lazy normalization? i.e. normalize during decoding
         self._normalize_params()
     
-    def _normalize_params(self,):
-        # NOTE: n_seq is NOT equal to len(X) due to plus-one smoothing
-        n_seq = sum(self.initial_probs.values())
-        self.initial_probs = {state: n_init / n_seq
-                              for state, n_init in self.initial_probs.items()}
-        for state in self.transitions:
-            total_trans = sum(self.transitions[state].values())
-            self.transitions[state] = {
-                next_state: n_trans / total_trans 
-                for next_state, n_trans in self.transitions[state].items()
-            }
-            total_emiss = sum(self.emissions[state].values())
-            self.emissions[state] = {
-                obs: n_emiss / total_emiss
-                for obs, n_emiss in self.emissions[state].items()
-            }
-
     def _init_params(self, X, y):
         """Initialize state space, obs space and priors."""
-        # create state space from training data
-        self.states = set(state for state_seq in y for state in state_seq)
-        # initial probabilities: plus-one smoothing 
-        self.initial_probs = {state: 1 for state in self.states}
-        # TODO: no smoothing for transitions or emissions?
-        self.transitions = {state: defaultdict(lambda: 0) 
-                            for state in self.states}
-        self.emissions = {state: defaultdict(lambda: 0) 
-                            for state in self.states}
-        # Do I even need to save the obs space separately?
-        # Already included in emissions.values().keys()
-        if self.obs is None:
-            self.obs = set()
+        self.states = set(st for state_seq in y for st in state_seq)
+        self.obs = set(o for obs_seq in X for o in obs_seq)
+        # NOTE: plus-one smoothing for all possible combinations.
+        self.init_probs = {st: 1 for st in self.states}
+        self.trans = {st: {st: 1 for st in self.states} for st in self.states}
+        self.emiss = {st: {} for st in self.states}
 
     def _fit_params(self, X, y):
+        """MAP estimation of HMM probability distributions."""
         for obs_seq, state_seq in zip(X, y):
-            for i, (obs, state) in enumerate(zip(obs_seq, state_seq)):
-                self.obs.update(obs)
+            for i, (obs, st) in enumerate(zip(obs_seq, state_seq)):
                 if 0 == i:
-                    self.initial_probs[state] += 1
+                    self.init_probs[st] += 1
                 else:
-                    self.transitions[state_seq[i-1]][state] += 1
-                self.emissions[state][obs] += 1
+                    prev_st = state_seq[i-1]
+                    self.trans[prev_st][st] += 1
+                if obs in self.emiss[st]:
+                    self.emiss[st][obs] += 1
+                else:
+                    self.emiss[st][obs] = 1
 
-    def decode(self, X: List[List[str]]) -> List[List[str]]:
-        """Find the most likely state sequence corresponding to X. 
-        Uses the Viterbi decoding algorithm.
+    def _normalize_params(self):
+        """All probability distributions must sum to one."""
+        # NOTE: n_seq is NOT equal to len(X) due to plus-one smoothing
+        #n_seq = sum(self.init_probs.values())
+        normalize_dict(self.init_probs)
+        for st in self.states:
+            normalize_dict(self.trans[st])
+            normalize_dict(self.emiss[st])
+
+    def decode(self, X, likelihood=logaddexp):
+        """Find the most likely (hidden) state seq given observation seq X,
+        through the Viterbi decoding algorithm.
         """
-        return [self._viterbi(obs_seq) for obs_seq in X]
+        return [self.viterbi(obs_seq, likelihood=likelihood) for obs_seq in X]
 
-    def _viterbi(self, obs: List[str]) -> List[str]:
-        raise NotImplementedError
+    def viterbi(self, obs_seq, likelihood=logaddexp):
+        """Viterbi decoding algorithm.
+        * Let Pr[t][s] denote the probability of ending up in state s
+        at time t, given the most probable path s*[0:t-1].
+        * Let V[t][s] denote the most likely prev state s*[t-1],
+        of the optimal path s*[0:t-1], ending up in state s at timestep t.
+        """
+        T, init_obs = len(obs_seq), obs_seq[0]
+        init_obs = obs_seq[0]
+        # Base case fwd
+        Pr = {t: {st: 0. for st in self.states} for t in range(T)}
+        for st in self.states:
+            if init_obs in self.emiss[st]:
+                Pr[0][st] = likelihood(self.init_probs[st], self.emiss[st][init_obs])
+            elif init_obs in self.obs:
+                Pr[0][st] = 0.
+            else:
+                Pr[0][st] = likelihood(self.init_probs[st])
 
-    def save_json(self, file_name: str = "hmmmodel.txt") -> None:
+        V = {t: {st: None for st in self.states} for t in range(T)}
+
+        # Forward pass
+        for t, obs in enumerate(obs_seq[1:], start=1):
+            for st in self.states:
+                if obs in self.emiss[st]:
+                    emiss_prob = self.emiss[st][obs]
+                    prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob, 
+                                                          likelihood)
+                elif obs in self.obs:
+                    Pr[t][st] = 0.
+                    prev_max_st = None
+                else:  # unseen word
+                    emiss_prob = 0
+                    prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob,
+                                                          likelihood)
+                    #Pr[t][st] = self.trans[st][prev_max_st]
+                #prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob)
+                V[t][st] = prev_max_st
+
+        # Backward pass
+        best_state = max(Pr[T-1], key=Pr[T-1].get)
+        out_path = [best_state]
+        for t in range(T-1, 0, -1):
+            try:
+                best_state = V[t][best_state]
+            except KeyError:
+                print(t)
+                return Pr, V
+            out_path.insert(0, best_state)
+
+        return out_path
+    
+    def _compute_max_state(self, Pr, t, state, emiss_prob, likelihood):
+        max_state = None
+        for prev_st in self.states:
+            prob_so_far = Pr[t-1][prev_st]
+
+            cur_prob = self._compute_likelihood(prob_so_far, state, prev_st, 
+                                                emiss_prob, likelihood)
+            if cur_prob > Pr[t][state]:
+                Pr[t][state] = cur_prob
+                max_state = prev_st
+
+        return max_state
+
+    def _compute_likelihood(self, prob_so_far, state, 
+                            prev_st, emiss_prob, likelihood):
+        trans_prob = self.trans[prev_st][state]
+        return likelihood(prob_so_far, emiss_prob, trans_prob)
+
+    def save_params(self, file_name="hmmmodel.txt"):
         """Write model params to human-interpretable, json-format txt file."""
-        params = vars(self)
-        for key, var in params.items():
-            if isinstance(var, set):  
-                # sets can't be converted to json, go figure
-                #print('TODO: convert sets to list, then back to set upon load.')
-                params[key] = list(var)
+        params = vars(self)  # NOTE: dangerous, doesn't create copy
+        for attr_name, val in params.items():
+            if isinstance(val, set):  
+                # NOTE: sets can't be converted to json, go figure
+                params[attr_name] = list(val)
 
         json_txt = json.dumps(vars(self), indent=4)
         with open(file_name, mode='w') as f:
             f.write(json_txt)
 
-    def load_json(self, file_name: str = "hmmmodel.txt") -> None:
-        """Load pretrained model params from a json-formatted file."""
+    def load_params(self, file_name="hmmmodel.txt"):
+        """Load model params from a json-formatted txt file."""
         with open(file_name, mode='r') as f:
             params = json.load(f)
 
-        for key, val in params.items():
-            if "states" == key or "obs" == key:
+        for attr_name, val in params.items():
+            #if "states" == key or "obs" == key:
+            if isinstance(val, list):
                 val = set(val)
-            setattr(self, key, val)
-        
-
-if __name__ == '__main__':
-    hmm = HMM()
-
-    hmm.load_json()
-    print(vars(hmm))
+            setattr(self, attr_name, val)
