@@ -1,22 +1,30 @@
 """Hidden Markov model class."""
 import json
 
-from utils import normalize_dict, logaddexp2, logaddexp
+from utils import normalize_dict, logaddexp2, logaddexp, prod
 
 class HMM:
     """Hidden Markov model with discrete (i.e. categorical) emissions."""
     def __init__(self,):
         self.states = None
+        self.open_states = None
         self.obs = None
         self.init_probs = None # assume categorical dist.
         self.trans = None      # assume categorical dist.
         self.emiss = None      # assume categorical dist.
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_open=5):
         """Estimate HMM parameters."""
         self._init_params(X, y)
         self._fit_params(X, y)
         self._normalize_params()
+        self._open_states(n_open)
+
+    def _open_states(self, n_open):
+        """Determine open states for unseen obs."""
+        vocab = {st: len(obs) for st, obs in self.emiss.items()}
+        vocab_list = sorted(list(vocab), key=vocab.get, reverse=True)
+        self.open_states = set(vocab_list[:n_open])
     
     def _init_params(self, X, y):
         """Initialize state space, obs space and priors."""
@@ -56,23 +64,19 @@ class HMM:
         """
         return [self.viterbi(obs_seq, likelihood=likelihood) for obs_seq in X]
 
-    def viterbi(self, obs_seq, likelihood=logaddexp):
-        """Viterbi decoding algorithm.
-        * Let Pr[t][s] denote the probability of ending up in state s
-        at time t, given the most probable path s*[0:t-1].
-        * Let V[t][s] denote the most likely prev state s*[t-1],
-        of the optimal path s*[0:t-1], ending up in state s at timestep t.
-        """
+    def viterbi(self, obs_seq, likelihood=logaddexp2):
+        """Viterbi decoding algorithm."""
         T, init_obs = len(obs_seq), obs_seq[0]
         # Base case fwd
         Pr = {t: {st: 0. for st in self.states} for t in range(T)}
         for st in self.states:
             if init_obs in self.emiss[st]:
                 Pr[0][st] = likelihood(self.init_probs[st], self.emiss[st][init_obs])
-            elif init_obs in self.obs:
-                Pr[0][st] = 0.
-            else:
+            elif init_obs not in self.obs and st in self.open_states:
+                # obs unseen during training, consider only open states.
                 Pr[0][st] = likelihood(self.init_probs[st])
+            else:
+                Pr[0][st] = 0.
 
         V = {t: {st: None for st in self.states} for t in range(T)}
 
@@ -88,15 +92,14 @@ class HMM:
                     emiss_prob = self.emiss[st][obs]
                     prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob, 
                                                           likelihood)
-                elif obs in self.obs:
-                    Pr[t][st] = 0.
-                    prev_max_st = None
-                else:  # unseen word
+                elif obs not in self.obs and st in self.open_states:
+                    # obs unseen during training, consider only open states.
                     emiss_prob = 0.
                     prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob,
                                                           likelihood)
-                    #Pr[t][st] = self.trans[st][prev_max_st]
-                #prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob)
+                else:
+                    Pr[t][st] = 0.
+                    prev_max_st = None
                 V[t][st] = prev_max_st
 
     def _backward(self, best_state, V, T):
@@ -111,11 +114,15 @@ class HMM:
         return out_path
     
     def _compute_max_state(self, Pr, t, state, emiss_prob, likelihood):
+        """Argmax."""
         max_state = None
         for prev_st in self.states:
             prob_so_far = Pr[t-1][prev_st]
             trans_prob = self.trans[prev_st][state]
-            cur_prob = likelihood(prob_so_far, emiss_prob, trans_prob)
+            if emiss_prob > 0:
+                cur_prob = likelihood(prob_so_far, trans_prob, emiss_prob)
+            else:
+                cur_prob = likelihood(prob_so_far, trans_prob)
             if cur_prob > Pr[t][state]:
                 Pr[t][state] = cur_prob
                 max_state = prev_st
