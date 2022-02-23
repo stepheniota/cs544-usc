@@ -14,14 +14,12 @@ class POSData:
             self.read_txt()
 
     def read_txt(self):
-        """Note:
-
-        The slash character / is the separator between words and tags, 
-        but it also appears within words in the text. Slashes never 
-        appear in the tags, so the separator is always the last slash
-        in the word/tag sequence. 
+        """Note: The slash char '/' is the separator between words
+        and tags, but may also appear within words in the text. 
+        Slashes never appear in the tags; the separator is always 
+        the last slash in the <word/tag> sequence. 
         
-        i.e., use string.rsplit('/') as opposed to string.split('/').
+        tldr; use string.rsplit('/') as opposed to string.split('/').
         """
         with open(self.root, mode='r') as f:
             if self.train:

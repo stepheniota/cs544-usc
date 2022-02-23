@@ -34,7 +34,7 @@ def dev_hmm():
 
         ref_data = POSData(data_path/lang[ref_idx], train=True)
         score = utils.accuracy_score(y=ref_data.y, y_hat=y_hat)
-        print(f'\t Language: {lang[0][:2]} \t Accuracy: {score}')
+        print(f'\t Language: {lang[0][:2]} \t Accuracy: {score:0.10f}')
 
 
 if __name__ == '__main__':

@@ -15,24 +15,14 @@ def normalize_dict(d, scale=None, in_place=True):
         return {key: val/scale for key, val in d.items()}
 
 def logaddexp2(*args):
-    out = float(0)
-    for n in args:
-        out += 2**n
-    return np.log2(out)
+    return np.log2(sum(2**n for n in args))
 
 def logaddexp(*args):
-    out = float(0)
-    for n in args:
-        out += np.exp(n)
-    return np.log(out)
+    return np.log(sum(np.exp(n) for n in args))
 
 def log_sum(*args):
     """Compute sum_i { log(args[i]) }"""
-    out = float(0.0)
-    for n in args:
-        if n > 0:
-            out += math.log(n)
-    return out
+    return sum(np.log(n) for n in args)
 
 def prod(*args):
     out = float(1.0)
@@ -45,17 +35,6 @@ def accuracy_score(y, y_hat):
     score = sum(true == pred for i, j in zip(y, y_hat) 
                 for true, pred in zip(i, j))
     return score / sum(len(yy) for yy in y)
-
-def compare_output(manual_path, tagged_path):
-    total = correct = 0
-    with open(manual_path, mode='r') as f:
-        manual_data = f.readlines()
-    with open(tagged_path, mode='r') as f:
-        tagged_data = f.readlines()
-    for x, y in zip(manual_data, tagged_data):
-        total += 1
-        if x == y: correct += 1
-    return correct / total
 
 def write_output(X, y_hat, file_name="hmmoutput.txt"):
     with open(file_name, mode='w') as f:

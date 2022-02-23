@@ -50,7 +50,7 @@ class HMM:
             normalize_dict(self.trans[st])
             normalize_dict(self.emiss[st])
 
-    def decode(self, X, likelihood=logaddexp):
+    def decode(self, X, likelihood=logaddexp2):
         """Find the most likely (hidden) state seq given observation seq X,
         through the Viterbi decoding algorithm.
         """
@@ -64,7 +64,6 @@ class HMM:
         of the optimal path s*[0:t-1], ending up in state s at timestep t.
         """
         T, init_obs = len(obs_seq), obs_seq[0]
-        init_obs = obs_seq[0]
         # Base case fwd
         Pr = {t: {st: 0. for st in self.states} for t in range(T)}
         for st in self.states:
@@ -77,7 +76,12 @@ class HMM:
 
         V = {t: {st: None for st in self.states} for t in range(T)}
 
-        # Forward pass
+        self._forward(Pr, V, obs_seq, likelihood)
+        best_state = max(Pr[T-1], key=Pr[T-1].get)
+        return self._backward(best_state, V, T)
+
+    def _forward(self, Pr, V, obs_seq, likelihood):
+        """Fwd pass of the viterbi decoding algorithm."""
         for t, obs in enumerate(obs_seq[1:], start=1):
             for st in self.states:
                 if obs in self.emiss[st]:
@@ -88,43 +92,35 @@ class HMM:
                     Pr[t][st] = 0.
                     prev_max_st = None
                 else:  # unseen word
-                    emiss_prob = 0
+                    emiss_prob = 0.
                     prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob,
                                                           likelihood)
                     #Pr[t][st] = self.trans[st][prev_max_st]
                 #prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob)
                 V[t][st] = prev_max_st
 
-        # Backward pass
-        best_state = max(Pr[T-1], key=Pr[T-1].get)
+    def _backward(self, best_state, V, T):
+        """Backtracking."""
         out_path = [best_state]
         for t in range(T-1, 0, -1):
             try:
                 best_state = V[t][best_state]
+                out_path.insert(0, best_state)
             except KeyError:
-                print(t)
-                return Pr, V
-            out_path.insert(0, best_state)
-
+                print(f"KeyError, t={t}.")
         return out_path
     
     def _compute_max_state(self, Pr, t, state, emiss_prob, likelihood):
         max_state = None
         for prev_st in self.states:
             prob_so_far = Pr[t-1][prev_st]
-
-            cur_prob = self._compute_likelihood(prob_so_far, state, prev_st, 
-                                                emiss_prob, likelihood)
+            trans_prob = self.trans[prev_st][state]
+            cur_prob = likelihood(prob_so_far, emiss_prob, trans_prob)
             if cur_prob > Pr[t][state]:
                 Pr[t][state] = cur_prob
                 max_state = prev_st
 
         return max_state
-
-    def _compute_likelihood(self, prob_so_far, state, 
-                            prev_st, emiss_prob, likelihood):
-        trans_prob = self.trans[prev_st][state]
-        return likelihood(prob_so_far, emiss_prob, trans_prob)
 
     def save_params(self, file_name="hmmmodel.txt"):
         """Write model params to human-interpretable, json-format txt file."""
