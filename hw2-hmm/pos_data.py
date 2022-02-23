@@ -1,15 +1,15 @@
 """Dataclass."""
-from pathlib import Path
 
 class POSData:
     """Dataclass for tagged parts-of-speech data."""
     END_STATE = "<END_STATE>"
     END_OBS = "<END_OBS>"
-    def __init__(self, root, train, read=True):
+    def __init__(self, root, train, read=True, end_state=False):
         self.root = root
         self.train = train
         self.X = None
         self.y = None
+        self.end_state = end_state
         if read:
             self.read_txt()
 
@@ -35,16 +35,19 @@ class POSData:
                         assert '/' not in word_tag[1]
                         cur_X.append(word_tag[0])
                         cur_y.append(word_tag[1])
-                    cur_X.append(self.END_OBS)
-                    cur_y.append(self.END_STATE)
+                    if self.end_state:
+                        cur_X.append(self.END_OBS)
+                        cur_y.append(self.END_STATE)
                     self.X.append(cur_X)
                     self.y.append(cur_y)
             else:
                 self.X = []
                 for line in f:
+                    #self.X.append(cur_X)
                     cur_X = line.split()
-                    cur_X.append(self.END_OBS)
-                self.X.append(cur_X)
+                    if self.end_state:
+                        cur_X.append(self.END_OBS)
+                    self.X.append(cur_X)
     
     def __iter__(self):
         return zip(self.X, self.y)
