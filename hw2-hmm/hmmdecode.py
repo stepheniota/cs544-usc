@@ -6,9 +6,8 @@ from pos_data import POSData
 from utils import write_output
 
 
-def decode_hmm(data_path: str) -> None:
+def decode_hmm(data_path):
     data = POSData(data_path, train=False)
-    data.read_txt()
 
     hmm = HMM()
     hmm.load_params()

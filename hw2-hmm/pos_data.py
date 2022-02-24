@@ -21,7 +21,7 @@ class POSData:
         
         tldr; use string.rsplit('/') as opposed to string.split('/').
         """
-        with open(self.root, mode='r') as f:
+        with open(self.root, mode='r', encoding="UTF-8") as f:
             if self.train:
                 self.X, self.y = [], []
                 for line in f:
