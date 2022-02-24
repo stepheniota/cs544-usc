@@ -1,38 +1,39 @@
 """Hidden Markov model class."""
 import json
 
-from utils import normalize_dict, logaddexp2, logaddexp, prod
+from utils import *
 
 class HMM:
-    """Hidden Markov model with discrete (i.e. categorical) emissions."""
-    def __init__(self,):
+    """Hidden Markov model with categorical (i.e. discrete) emissions."""
+    def __init__(self):
         self.states = None
         self.open_states = None
         self.obs = None
-        self.init_probs = None # assume categorical dist.
-        self.trans = None      # assume categorical dist.
-        self.emiss = None      # assume categorical dist.
+        self.init_probs = None  # assume categorical dist.
+        self.trans = None  # assume categorical dist.
+        self.emiss = None  # assume categorical dist.
 
-    def fit(self, X, y, n_open=5):
+    def fit(self, X, y, n_open=4):
         """Estimate HMM parameters."""
         self._init_params(X, y)
         self._fit_params(X, y)
-        self._normalize_params()
         self._open_states(n_open)
+        self._normalize_params()
 
     def _open_states(self, n_open):
         """Determine open states for unseen obs."""
         vocab = {st: len(obs) for st, obs in self.emiss.items()}
         vocab_list = sorted(list(vocab), key=vocab.get, reverse=True)
-        self.open_states = set(vocab_list[:n_open])
-    
+        vocab_list = vocab_list[:n_open]
+        self.open_states = {st: 1 for st in vocab_list}
+
     def _init_params(self, X, y):
         """Initialize state space, obs space and priors."""
         self.states = set(st for state_seq in y for st in state_seq)
         self.obs = set(o for obs_seq in X for o in obs_seq)
         # NOTE: plus-one smoothing for all possible combinations.
-        self.init_probs = {st: 1 for st in self.states}
-        self.trans = {st: {st: 1 for st in self.states} for st in self.states}
+        self.init_probs = {st: 1. for st in self.states}
+        self.trans = {prev_st: {st: 1. for st in self.states} for prev_st in self.states}
         self.emiss = {st: {} for st in self.states}
 
     def _fit_params(self, X, y):
@@ -51,24 +52,27 @@ class HMM:
 
     def _normalize_params(self):
         """All probability distributions must sum to one."""
-        # NOTE: n_seq is NOT equal to len(X) due to plus-one smoothing
-        #n_seq = sum(self.init_probs.values())
         normalize_dict(self.init_probs)
+        normalize_dict(self.open_states)
+
         for st in self.states:
             normalize_dict(self.trans[st])
             normalize_dict(self.emiss[st])
 
-    def decode(self, X, likelihood=logaddexp2):
+    def decode(self, X, likelihood=logaddexp):
         """Find the most likely (hidden) state seq given observation seq X,
         through the Viterbi decoding algorithm.
         """
         return [self.viterbi(obs_seq, likelihood=likelihood) for obs_seq in X]
 
-    def viterbi(self, obs_seq, likelihood=logaddexp2):
+    def viterbi(self, obs_seq, likelihood):
         """Viterbi decoding algorithm."""
-        T, init_obs = len(obs_seq), obs_seq[0]
-        # Base case fwd
+        T = len(obs_seq)
         Pr = {t: {st: 0. for st in self.states} for t in range(T)}
+        V = {t: {st: None for st in self.states} for t in range(T)}
+
+        # Base case fwd
+        init_obs = obs_seq[0]
         for st in self.states:
             if init_obs in self.emiss[st]:
                 Pr[0][st] = likelihood(self.init_probs[st], self.emiss[st][init_obs])
@@ -78,11 +82,12 @@ class HMM:
             else:
                 Pr[0][st] = 0.
 
-        V = {t: {st: None for st in self.states} for t in range(T)}
-
         self._forward(Pr, V, obs_seq, likelihood)
+
         best_state = max(Pr[T-1], key=Pr[T-1].get)
-        return self._backward(best_state, V, T)
+        best_path = self._backward(V, best_state, T)
+
+        return best_path
 
     def _forward(self, Pr, V, obs_seq, likelihood):
         """Fwd pass of the viterbi decoding algorithm."""
@@ -90,39 +95,42 @@ class HMM:
             for st in self.states:
                 if obs in self.emiss[st]:
                     emiss_prob = self.emiss[st][obs]
-                    prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob, 
+                    prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob,
                                                           likelihood)
                 elif obs not in self.obs and st in self.open_states:
                     # obs unseen during training, consider only open states.
-                    emiss_prob = 0.
+                    emiss_prob = self.open_states[st]
                     prev_max_st = self._compute_max_state(Pr, t, st, emiss_prob,
                                                           likelihood)
                 else:
                     Pr[t][st] = 0.
-                    prev_max_st = None
-                V[t][st] = prev_max_st
+                if 0 != Pr[t][st]:
+                    V[t][st] = prev_max_st
 
-    def _backward(self, best_state, V, T):
+    def _backward(self, V, best_state, T):
         """Backtracking."""
         out_path = [best_state]
-        for t in range(T-1, 0, -1):
-            try:
+        try:
+            for t in range(T-1, 0, -1):
                 best_state = V[t][best_state]
                 out_path.insert(0, best_state)
-            except KeyError:
-                print(f"KeyError, t={t}.")
-        return out_path
-    
+            return out_path
+        except KeyError:
+            print(f"KeyError, t={t}.")
+            while t > 0:
+                out_path.append(None)
+                t -= 1
+                assert len(out_path) == T
+                return out_path
+
     def _compute_max_state(self, Pr, t, state, emiss_prob, likelihood):
         """Argmax."""
         max_state = None
         for prev_st in self.states:
             prob_so_far = Pr[t-1][prev_st]
             trans_prob = self.trans[prev_st][state]
-            if emiss_prob > 0:
-                cur_prob = likelihood(prob_so_far, trans_prob, emiss_prob)
-            else:
-                cur_prob = likelihood(prob_so_far, trans_prob)
+
+            cur_prob = likelihood(prob_so_far, trans_prob, emiss_prob)
             if cur_prob > Pr[t][state]:
                 Pr[t][state] = cur_prob
                 max_state = prev_st
@@ -133,7 +141,7 @@ class HMM:
         """Write model params to human-interpretable, json-format txt file."""
         params = vars(self)  # NOTE: dangerous, doesn't create copy
         for attr_name, val in params.items():
-            if isinstance(val, set):  
+            if isinstance(val, set):
                 # NOTE: sets can't be converted to json, go figure
                 params[attr_name] = list(val)
 
@@ -147,7 +155,6 @@ class HMM:
             params = json.load(f)
 
         for attr_name, val in params.items():
-            #if "states" == key or "obs" == key:
             if isinstance(val, list):
                 val = set(val)
             setattr(self, attr_name, val)
