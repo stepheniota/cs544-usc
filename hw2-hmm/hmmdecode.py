@@ -3,7 +3,7 @@ import sys
 
 from hmmmodel import HMM
 from pos_data import POSData
-from utils import write_output, prod, logaddexp2
+from utils import write_output
 
 
 def decode_hmm(data_path):
@@ -11,7 +11,7 @@ def decode_hmm(data_path):
 
     hmm = HMM()
     hmm.load_params()
-    y_hat = hmm.decode(data.X, prod)
+    y_hat = hmm.decode(data.X)
 
     write_output(data.X, y_hat)
 
