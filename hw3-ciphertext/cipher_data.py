@@ -1,5 +1,48 @@
+import torch
 from torch.nn.functional import one_hot
 from torch.utils.data import Dataset
+
+
+class CipherNGramData(Dataset):
+    def __init__(self, ciphertxtdata, context_size=3, process_now=True):
+        self.vocab = None
+        self.vocab_size = None
+        self.word_to_idx = None
+        self.X = None
+        self.y = None
+
+        self.text = ciphertxtdata
+        self.context_size = context_size
+        if process_now:
+            self.process_text()
+
+    def process_text(self):
+        text = [x for y in self.text for x in y]
+        self.vocab = set(text)
+        self.vocab_size = len(self.vocab)
+        self.word_to_idx = {word: i for i, word in enumerate(self.vocab)}
+
+        self.ngrams = [
+            [[text[i - j - 1] for j in range(self.context_size)], text[i]]
+            for i in range(self.context_size, len(text))
+        ]
+
+        self.X, self.y = [], []
+        for i in range(self.context_size, len(text)):
+            self.X.append([text[i - j - 1] for j in range(self.context_size)])
+            self.y.append(text[i])
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, i):
+        X = self.X[i]
+        X = torch.tensor([self.word_to_idx[w] for w in X], dtype=torch.long)
+        y = self.y[i]
+        y = torch.tensor([self.word_to_idx[y]])
+
+        return X, y
+
 
 class CipherVecData(Dataset):
     def __init__(self, X, y=None, transform=None, target_transform=None):
