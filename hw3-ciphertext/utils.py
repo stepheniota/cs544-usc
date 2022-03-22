@@ -1,27 +1,40 @@
-from dataclasses import dataclass, asdict, field
+from pathlib import Path
+from typing import Sequence, Iterable, Union
 
 import numpy as np
+import torch
 
-@dataclass(frozen=True)
-class Hyperparams:
-    in_features: int
-    out_features: int = 2
-    lr: float = 1e-4
-    n_epoch: int = 100
-    batch_size: int = 16
-    optim: str = "SGD"
-    loss: str = "BCE"
 
-    def asdict(self):
-        return asdict(self)
-
-def accuracy_score_scalers(y_true, y_pred):
+def accuracy_score_scalers(y_true: Sequence, y_pred: Sequence) -> float:
+    """Score predictions against reference given scalar class labels,
+    i.e., labels[i] ~ {0, 1}.
+    """
     correct = np.sum(y_true == y_pred)
     score = correct / len(y_true)
 
     return score
 
-def save_results(results, file_name="upload_predictions.txt"):
+
+def save_checkpoint(model_state: dict,
+                    optim_state: dict,
+                    file_name: Union[str, Path],
+                    **params) -> None:
+    """Checkpoint model params during training."""
+    checkpoint = {"model_state_dict": model_state,
+                  "optim_state_dict": optim_state}
+    for key, val in params.items():
+        checkpoint[key] = val
+    torch.save(checkpoint, file_name)
+
+
+def load_checkpoint(file_name: Union[str, Path]) -> dict:
+    """Retrieve saved model state dict."""
+    return torch.load(file_name)
+
+
+def save_results(results: Sequence[int],
+                 file_name: Union[str, Path] = "upload_predictions.txt") -> None:
+    """Write final predictions to submission file."""
     with open(file_name, mode='w', encoding="utf-8") as f:
         for x in results:
             out = str(int(x))
@@ -29,5 +42,4 @@ def save_results(results, file_name="upload_predictions.txt"):
 
 
 if __name__ == "__main__":
-    hparams = Hyperparams(in_features=50, out_features=2, optim="adam")
-    print(asdict(hparams))
+    print(issubclass(Sequence, Iterable))
