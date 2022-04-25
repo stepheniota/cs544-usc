@@ -87,36 +87,6 @@ class CipherNGramData(Dataset):
 
     If ngrams are retrieved using `__get_item__` method,
     returns one-hot encoding of ngrams.
-
-    params
-    ------
-    ciphertxtdata : CipherTxtData
-        dataclass containing unprocesses text.
-    context_size : int
-        "n"-gram size.
-
-    attributes
-    ----------
-    context_size : int
-        "n"-gram size.
-    text : list[str]
-        flattened list of unprocesses text.
-    vocab : set[str]
-        all words in self.text.
-    vocab_size : int
-        number of words in self.vocab.
-    word_to_idx : dict
-        maps words to index value for one-hot encoding.
-    ngrams : list[list[str], str]
-        generated ngrams from self.text, where ngrams[i][0] is the
-        context , and ngrams[i][1] is the target.
-    X : list[str]
-        list of all contexts.
-    y : list[str]
-        list of all targets.
-
-
-
     """
     def __init__(self, ciphertxtdata: CipherTxtData, context_size: int = 3):
         self.context_size = context_size
@@ -149,79 +119,46 @@ class CipherNGramData(Dataset):
 
 
 class CipherW2VData(Dataset):
-    """Dataclass that generates w2v embeddings.
-
-    params
-    ------
-    corpus : CipherCorpus or list
-        iterable of documents that is made to be restartable.
-    as_tensor : bool
-        whether to convert __getitem__ retrieval to tensor.
-    **w2vparams : optional **kwargs
-        params to pass to Word2vec model
-
-    attributes
-    ----------
-    corpus : CipherCorpus
-        restartable iterable of documents.
-    as_tensor : bool
-        whether to convert __getitem__ retrieval to tensor.
-    wv : gensim.models.keyedvectors.KeyedVectors
-        dictionary mapping words to their w2v embedding
-    """
-
+    """Dataclass that generates w2v embeddings."""
+    OOV = '~'
     def __init__(self,
                  corpus: Union[CipherCorpus, list],
-                 as_tensor: bool = False,
+                 wv: Optional[gensim.models.Word2Vec] = None,
                  **w2vparams) -> None:
+        super().__init__()
         if not isinstance(corpus, CipherCorpus):
             corpus = CipherCorpus(corpus)
         self.corpus = corpus
-        self.as_tensor = as_tensor
 
-        model = gensim.models.Word2Vec(sentences=self.corpus, **w2vparams)
-        self.wv = model.wv
-        del model
+        if not wv:
+            model = gensim.models.Word2Vec(sentences=self.corpus, **w2vparams)
+            self.wv = model.wv
+            del model
+        else:
+            self.wv = wv
 
     def __len__(self):
         return len(self.corpus.text)
 
     def __getitem__(self, i):
         sentence = self.corpus.text[i]
-        sentence = [self.wv[word] for word in sentence]
-        sentence = np.asarray(sentence)
-        if self.as_tensor:
-            sentence = torch.from_numpy(sentence)
 
-        return sentence
+        sentence_emb = []
+        for word in sentence:
+            if word in self.wv:
+                emb = self.wv[word]
+            else:
+                emb = self.wv[self.OOV]
+            emb = torch.tensor(emb)
+            sentence_emb.append(emb)
+
+
+        return sentence_emb
 
 
 
 class CipherVecData(Dataset):
-    """General dataclass for ciphertext embeddings.
-
-    params
-    ------
-    X : list-like
-        input data, presumably vectorized.
-    y : list-like or None
-        target labels
-    transform : callable or None
-        function to apply to X[i] during retrieval.
-    target_transfrom : callable or None
-        function to apply to y[i] during retrieval.
-
-    attributes
-    ----------
-    X : list-list
-        input data
-    y : list-like or None
-        target labels
-    transform : callable or None
-        function to apply to X[i] during retrieval.
-    target_transfrom : callable or None
-        function to apply to y[i] during retrieval.
-    """
+    """General dataclass for ciphertext embeddings."""
     def __init__(self, X: Sequence, y: Optional[Sequence] = None,
                  transform: Callable = None,
                  target_transform: Callable= None) -> None:

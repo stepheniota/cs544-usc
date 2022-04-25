@@ -5,14 +5,30 @@ import numpy as np
 import torch
 
 
-def accuracy_score_scalers(y_true: Sequence, y_pred: Sequence) -> float:
+def accuracy_score_scalers(y_true: Sequence, y_pred: Sequence,
+                           normalize: bool = True) -> float:
     """Score predictions against reference given scalar class labels,
     i.e., labels[i] ~ {0, 1}.
     """
     correct = np.sum(y_true == y_pred)
-    score = correct / len(y_true)
+    score = correct / len(y_true) if normalize else int(correct)
 
     return score
+
+
+@torch.no_grad()
+def accuracy_score_logits(logits: torch.tensor, y_true: torch.tensor,
+                          normalize: bool = True) -> Union[float, int]:
+    """Score predictions against ref given logits,
+    i.e., argmax(logits[i]) = pred[i]
+    """
+    score = 0
+    for pair, true in zip(logits, y_true):
+        pred = torch.argmax(pair)
+        if pred == true:
+            score += 1
+
+    return score / len(y_true) if normalize else int(score)
 
 
 def save_checkpoint(model_state: dict,
@@ -39,7 +55,3 @@ def save_results(results: Sequence[int],
         for x in results:
             out = str(int(x))
             f.write(out + '\n')
-
-
-if __name__ == "__main__":
-    print(issubclass(Sequence, Iterable))

@@ -2,6 +2,10 @@
 ## gitignore template ##
 ########################
 
+############
+## IGNORE ##
+############
+#
 # macOS stuff
 .DS_Store
 
@@ -20,7 +24,10 @@
 # other
 .vscode/
 __pycache__/
+*.zip
 
 # specific
 readings/
 lectures/
+*.pt
+*.txt
