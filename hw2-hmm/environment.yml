@@ -1,9 +1,0 @@
-name: hmm
-channels:
-  - defaults
-dependencies:
-  - python==3.7.5
-  - ipython
-  - jupyterlab
-  - ipykernel
-  - numpy
