@@ -32,3 +32,8 @@ lectures/
 *.pt
 *.txt
 hw4-pnli/data
+project/
+article-presentations/
+hw2b-hmm.pdf
+hw0*
+
